@@ -107,7 +107,7 @@ def make_move():
     }
 
     if mode == "ai" and not board.is_game_over():
-        _, ai_move = minimax(board, 3, -float('inf'), float('inf'), True)
+        _, ai_move = minimax(board, 2, -float('inf'), float('inf'), True)
         if ai_move:
             board.push(ai_move)
             move_history.append(ai_move.uci())
