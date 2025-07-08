@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Python Chess Web</title>
+
+  <!-- Chessboard.js CSS -->
+  <link rel="stylesheet" href="./css/chessboard-1.0.0.min.css" />
+
+  <style>
+    body {
+      margin: 0;
+      background: #1e272e;
+      color: #f5f6fa;
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 1000px;
+      width: 100%;
+      background: #2f3640;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    h2 {
+      margin-top: 0;
+      text-align: center;
+      color: #00cec9;
+      letter-spacing: 1px;
+    }
+
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .controls label {
+      margin: 0 15px;
+      font-size: 16px;
+    }
+
+    .controls button {
+      background: #0984e3;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 10px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+
+    .controls button:hover {
+      background: #74b9ff;
+    }
+
+    #status {
+      text-align: center;
+      margin-bottom: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #f1c40f;
+    }
+
+    .board-and-moves {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    .board-container {
+      max-width: 400px;
+    }
+
+    #move-list {
+      background: #353b48;
+      padding: 15px;
+      border-radius: 5px;
+      font-size: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+      width: 300px;
+    }
+
+    #move-list div {
+      padding: 3px 0;
+      border-bottom: 1px solid #444;
+    }
+
+    .square-check {
+      background: radial-gradient(circle, rgba(231, 76, 60, 0.6) 50%, transparent 50%);
+    }
+
+    @media (max-width: 768px) {
+      h2 {
+        font-size: 1.5rem;
+      }
+
+      .controls button {
+        width: 100%;
+        margin: 10px 0;
+      }
+
+      #move-list {
+        max-height: 300px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>Python Chess Web</h2>
+
+    <div class="controls">
+      <label>
+        <input type="radio" name="mode" value="human" checked> Human vs Human
+      </label>
+      <label>
+        <input type="radio" name="mode" value="ai"> Human vs AI
+      </label>
+
+      <button id="new-game-button">New Game</button>
+      <button id="undo-button">Undo</button>
+    </div>
+
+    <div id="status">Loading...</div>
+
+    <div class="board-and-moves">
+      <div class="board-container">
+        <div id="board" style="width: 400px"></div>
+      </div>
+      <div id="move-list"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="./js/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+  <script>
+  var board = null;
+  var gameMode = 'human';
+  var game = new Chess();
+
+  function initBoard(fen) {
+    board = Chessboard('board', {
+      position: fen,
+      draggable: true,
+      onDrop: onDrop
+    });
+  }
+
+  function newGame() {
+    $.ajax({
+      url: "http://127.0.0.1:5000/new_game",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({ mode: gameMode }),
+      success: function (data) {
+        if (board === null) {
+          initBoard(data.fen);
+        } else {
+          board.position(data.fen);
+        }
+        $("#status").text(data.message);
+        $("#move-list").empty();
+        game.load(data.fen);
+        highlightCheck(data.fen);
+      },
+      error: function () {
+        $("#status").text("Error starting new game.");
+      }
+    });
+  }
+
+  function onDrop(source, target) {
+    var move = source + target;
+
+    var piece = game.get(source);
+    var targetRank = target[1];
+
+    if (piece && piece.type === 'p' &&
+      ((piece.color === 'w' && targetRank === '8') ||
+        (piece.color === 'b' && targetRank === '1'))) {
+      var promoteTo = prompt("Promote to (q, r, b, n):", "q");
+      if (!promoteTo) {
+        promoteTo = "q";
+      }
+      move += promoteTo.toLowerCase();
+    }
+
+    $.ajax({
+      url: "http://127.0.0.1:5000/move",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        move: move,
+        mode: gameMode
+      }),
+      success: function (data) {
+        if (data.success) {
+          game.load(data.fen);
+          board.position(data.fen);
+          $("#status").text(data.message);
+
+          if (gameMode === "ai") {
+            // Human move: always show "You played"
+            updateMoveList(data.move_text, "you", gameMode);
+          } else {
+            updateMoveList(data.move_text, data.player, gameMode);
+          }
+
+          highlightCheck(data.fen);
+
+          if (gameMode === "ai" && data.ai_move) {
+            setTimeout(function () {
+              board.move(data.ai_move);
+              board.position(data.fen);
+              $("#status").text("AI played " + data.ai_move);
+              updateMoveList(data.ai_move, "ai", gameMode);
+              highlightCheck(data.fen);
+            }, 800);
+          }
+        } else {
+          $("#status").text("Illegal move.");
+        }
+      }
+    });
+
+    return 'snapback';
+  }
+
+  function updateMoveList(moveText, player, mode) {
+    if (!moveText) return;
+
+    var moveStr;
+    if (mode === "human") {
+      moveStr = (player === "w" ? "White" : "Black") + " played: " + moveText;
+    } else {
+      if (player === "you") {
+        moveStr = "You played: " + moveText;
+      } else if (player === "ai") {
+        moveStr = "AI played: " + moveText;
+      }
+    }
+    $("#move-list").append("<div>" + moveStr + "</div>");
+  }
+
+  $("#new-game-button").on("click", function () {
+    newGame();
+  });
+
+  $("#undo-button").on("click", function () {
+    $.ajax({
+      url: "http://127.0.0.1:5000/undo",
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        mode: gameMode
+      }),
+      success: function (data) {
+        game.load(data.fen);
+        board.position(data.fen);
+        $("#status").text(data.message);
+        highlightCheck(data.fen);
+        $("#move-list").empty();
+      }
+    });
+  });
+
+  $('input[name="mode"]').on('change', function () {
+    gameMode = $(this).val();
+    newGame();
+  });
+
+  $(document).ready(function () {
+    newGame();
+  });
+
+  function highlightCheck(fen) {
+    $("div[class^='square-']").removeClass("square-check");
+
+    var g = new Chess(fen);
+
+    if (g.in_check()) {
+      var kingSquare = null;
+
+      var boardArray = g.board();
+      for (var rank = 0; rank < 8; rank++) {
+        for (var file = 0; file < 8; file++) {
+          var piece = boardArray[rank][file];
+          if (piece && piece.type === "k" && piece.color === g.turn()) {
+            var square = "abcdefgh"[file] + (8 - rank);
+            kingSquare = square;
+            break;
+          }
+        }
+        if (kingSquare) break;
+      }
+
+      if (kingSquare) {
+        $(".square-" + kingSquare).addClass("square-check");
+      }
+    }
+  }
+</script>
+
+</body>
+
+</html>
