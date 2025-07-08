@@ -3,7 +3,7 @@ from flask_cors import CORS
 import chess
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 app.secret_key = "supersecret"
 
 AI_COLOR = chess.BLACK
