@@ -164,7 +164,7 @@
 
   function newGame() {
     $.ajax({
-      url: "http://127.0.0.1:5000/new_game",
+      url: "https://chess-game-web-3.onrender.com//new_game",
       type: "POST",
       contentType: "application/json",
       data: JSON.stringify({ mode: gameMode }),
@@ -202,7 +202,7 @@
     }
 
     $.ajax({
-      url: "http://127.0.0.1:5000/move",
+      url: "https://chess-game-web-3.onrender.com//move",
       method: "POST",
       contentType: "application/json",
       data: JSON.stringify({
@@ -264,7 +264,7 @@
 
   $("#undo-button").on("click", function () {
     $.ajax({
-      url: "http://127.0.0.1:5000/undo",
+      url: "https://chess-game-web-3.onrender.com//undo",
       method: "POST",
       contentType: "application/json",
       data: JSON.stringify({
